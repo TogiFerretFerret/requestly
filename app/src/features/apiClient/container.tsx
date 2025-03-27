@@ -11,7 +11,6 @@ import { globalActions } from "store/slices/global/slice";
 import { redirectToUrl } from "utils/RedirectionUtils";
 import LINKS from "config/constants/sub/links";
 import { TabsContainer } from "componentsV2/Tabs/components/TabsContainer";
-import { TabServiceProvider } from "componentsV2/Tabs/store/TabServiceContextProvider";
 import "./container.scss";
 
 const ApiClientFeatureContainer: React.FC = () => {
@@ -62,14 +61,12 @@ const ApiClientFeatureContainer: React.FC = () => {
 
   return (
     <TabsLayoutContainer id="apiClient">
-      <TabServiceProvider>
-        <ApiClientProvider>
-          <div className="api-client-container">
-            <APIClientSidebar />
-            {user.loggedIn ? <TabsContainer /> : <>{loggedOutView}</>}
-          </div>
-        </ApiClientProvider>
-      </TabServiceProvider>
+      <ApiClientProvider>
+        <div className="api-client-container">
+          <APIClientSidebar />
+          {user.loggedIn ? <TabsContainer /> : <>{loggedOutView}</>}
+        </div>
+      </ApiClientProvider>
     </TabsLayoutContainer>
   );
 };
