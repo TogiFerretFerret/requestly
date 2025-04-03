@@ -24,7 +24,6 @@ interface CollectionViewProps {
 export const CollectionView: React.FC<CollectionViewProps> = ({ collectionId }) => {
   const { apiClientRecords, onSaveRecord, isLoadingApiClientRecords, apiClientRecordsRepository } =
     useApiClientContext();
-
   const { setTitle = () => {}, isNewTab = false } = useGenericState();
 
   const collection = useMemo(() => {
