@@ -17,7 +17,7 @@ type TabConfig = {
 type TabsState = {
   tabIdSequence: TabId;
   activeTabId: TabId;
-  activeTabSource: AbstractTabSource;
+  activeTabSource: AbstractTabSource | null;
   tabsIndex: Map<SourceName, SourceMap>; // Type: SourceName -> sourceId -> tabId eg: Request -> [requestId,tabId]
   tabs: Map<TabId, StoreApi<TabState>>;
 
