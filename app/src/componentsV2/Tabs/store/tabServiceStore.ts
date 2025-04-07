@@ -5,7 +5,16 @@ import { createTabStore, TabState, tabStateSetters } from "./tabStore";
 import { AbstractTabSource } from "../helpers/tabSource";
 import { createContext, ReactNode, useContext } from "react";
 import { tabSources } from "../constants";
-import { trackTabOpenClicked, trackTabOpened } from "../analytics";
+import {
+  trackTabCloseById,
+  trackTabCloseClicked,
+  trackTabClosed,
+  trackTabClosedById,
+  trackTabOpenClicked,
+  trackTabOpened,
+  trackTabsRehydrationCompleted,
+  trackTabsRehydrationStarted,
+} from "../analytics";
 
 type TabId = number;
 type SourceName = string;
@@ -136,9 +145,11 @@ const createTabServiceStore = () => {
         },
 
         closeTab(source) {
-          const { tabsIndex, closeTabById } = get();
           const sourceId = source.getSourceId();
           const sourceName = source.getSourceName();
+          trackTabCloseClicked(sourceId, source.type);
+
+          const { tabsIndex, closeTabById } = get();
 
           const existingTabId = tabsIndex.get(sourceName)?.get(sourceId);
           if (!existingTabId) {
@@ -146,6 +157,7 @@ const createTabServiceStore = () => {
           }
 
           closeTabById(existingTabId);
+          trackTabClosed(sourceId, source.type);
         },
 
         closeAllTabs() {
@@ -165,6 +177,7 @@ const createTabServiceStore = () => {
           const tabState = tabStore.getState();
           const sourceName = tabState.source.getSourceName();
           const sourceId = tabState.source.getSourceId();
+          trackTabCloseById(sourceId, tabState.source.type);
 
           if (tabState.saved) {
             // TODO: update alert message for RBAC viewer role
@@ -203,6 +216,7 @@ const createTabServiceStore = () => {
             tabs: new Map(tabs),
           });
           setActiveTab(newActiveTabId);
+          trackTabClosedById(sourceId, tabState.source.type);
         },
 
         setActiveTab(id: TabId) {
@@ -256,6 +270,18 @@ const createTabServiceStore = () => {
           tabs: state.tabs,
           _version: state._version,
         }),
+
+        onRehydrateStorage: (state) => {
+          // trackTabsRehydrationStarted();
+
+          return (state, error) => {
+            if (error) {
+              throw new Error(`Tabs rehydration failed - error:${error}`);
+            } else {
+              // trackTabsRehydrationCompleted();
+            }
+          };
+        },
 
         storage: {
           setItem: (name, newValue: StorageValue<TabServiceState>) => {
