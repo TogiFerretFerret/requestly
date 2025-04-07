@@ -6,10 +6,13 @@ import { AbstractTabSource } from "../helpers/tabSource";
 import { createContext, ReactNode, useContext } from "react";
 import { tabSources } from "../constants";
 import {
+  trackTabActionEarlyReturn,
   trackTabCloseById,
   trackTabCloseClicked,
   trackTabClosed,
   trackTabClosedById,
+  trackTabLocalStorageGetItemCalled,
+  trackTabLocalStorageSetItemCalled,
   trackTabOpenClicked,
   trackTabOpened,
   trackTabsRehydrationCompleted,
@@ -100,6 +103,7 @@ const createTabServiceStore = () => {
 
           const tabStore = tabs.get(tabId);
           if (!tabStore) {
+            trackTabActionEarlyReturn("updateTabBySourceId", "Tab store not found");
             return;
           }
 
@@ -124,6 +128,7 @@ const createTabServiceStore = () => {
           if (existingTabId) {
             setActiveTab(existingTabId);
             trackTabOpened(sourceId, source.type, config?.preview);
+            trackTabActionEarlyReturn("openTab", "Tab found");
             return;
           }
 
@@ -136,7 +141,7 @@ const createTabServiceStore = () => {
             }
 
             registerTabSource(tabId, source, config);
-
+            trackTabActionEarlyReturn("openTab", "Registering preview tab");
             return;
           }
 
@@ -153,6 +158,7 @@ const createTabServiceStore = () => {
 
           const existingTabId = tabsIndex.get(sourceName)?.get(sourceId);
           if (!existingTabId) {
+            trackTabActionEarlyReturn("closeTab", "Tab id not found");
             return;
           }
 
@@ -171,6 +177,7 @@ const createTabServiceStore = () => {
           const { tabs, tabsIndex, activeTabId, setActiveTab } = get();
           const tabStore = tabs.get(tabId);
           if (!tabStore) {
+            trackTabActionEarlyReturn("closeTabById", "Tab store not found");
             return;
           }
 
@@ -285,66 +292,79 @@ const createTabServiceStore = () => {
 
         storage: {
           setItem: (name, newValue: StorageValue<TabServiceState>) => {
-            const tabs = Array.from(newValue.state.tabs.entries()).map(([tabId, tabStore]) => [
-              tabId,
-              tabStore.getState(),
-            ]);
+            try {
+              trackTabLocalStorageSetItemCalled();
+              const tabs = Array.from(newValue.state.tabs.entries()).map(([tabId, tabStore]) => [
+                tabId,
+                tabStore.getState(),
+              ]);
 
-            const tabsIndex = Array.from(newValue.state.tabsIndex.entries()).map(([sourceName, sourceMap]) => [
-              sourceName,
-              Array.from(sourceMap.entries()),
-            ]);
+              const tabsIndex = Array.from(newValue.state.tabsIndex.entries()).map(([sourceName, sourceMap]) => [
+                sourceName,
+                Array.from(sourceMap.entries()),
+              ]);
 
-            const stateString = JSON.stringify({
-              ...newValue,
-              state: {
-                ...newValue.state,
-                tabs,
-                tabsIndex,
-              },
-            });
-            localStorage.setItem(name, stateString);
+              const stateString = JSON.stringify({
+                ...newValue,
+                state: {
+                  ...newValue.state,
+                  tabs,
+                  tabsIndex,
+                },
+              });
+              localStorage.setItem(name, stateString);
+            } catch (error) {
+              throw new Error(`Tab service setItem failed - error: ${error}`);
+            }
           },
 
           getItem: (name) => {
-            const stateString = localStorage.getItem(name);
+            try {
+              trackTabLocalStorageGetItemCalled();
+              const stateString = localStorage.getItem(name);
 
-            if (!stateString) {
-              return null;
+              if (!stateString) {
+                return null;
+              }
+
+              const existingValue = JSON.parse(stateString);
+
+              const tabsIndex: TabServiceState["tabsIndex"] = new Map(
+                existingValue.state.tabsIndex.map(
+                  // eslint-disable-next-line
+                  ([sourceName, sourceMap]: [string, MapIterator<[SourceId, TabId]>]) => [
+                    sourceName,
+                    new Map(sourceMap),
+                  ]
+                )
+              );
+
+              const tabs: TabServiceState["tabs"] = new Map(
+                existingValue.state.tabs.map(([tabId, tabState]: [TabId, TabState]) => [
+                  tabId,
+                  create<TabState>((set) => ({
+                    ...tabState,
+                    source: new tabSources[tabState.source.type](tabState.source.metadata as any), // FIXME: fix type
+                    ...tabStateSetters(set),
+                  })),
+                ])
+              );
+
+              const activeTab = tabs.get(existingValue.state.activeTabId).getState();
+              const activeTabSource = new tabSources[activeTab.source.type](activeTab.source.metadata as any);
+
+              return {
+                ...existingValue,
+                state: {
+                  ...existingValue.state,
+                  tabs,
+                  tabsIndex,
+                  activeTabSource,
+                },
+              };
+            } catch (error) {
+              throw new Error(`Tab service getItem failed - error: ${error}`);
             }
-
-            const existingValue = JSON.parse(stateString);
-
-            const tabsIndex: TabServiceState["tabsIndex"] = new Map(
-              existingValue.state.tabsIndex.map(
-                // eslint-disable-next-line
-                ([sourceName, sourceMap]: [string, MapIterator<[SourceId, TabId]>]) => [sourceName, new Map(sourceMap)]
-              )
-            );
-
-            const tabs: TabServiceState["tabs"] = new Map(
-              existingValue.state.tabs.map(([tabId, tabState]: [TabId, TabState]) => [
-                tabId,
-                create<TabState>((set) => ({
-                  ...tabState,
-                  source: new tabSources[tabState.source.type](tabState.source.metadata as any), // FIXME: fix type
-                  ...tabStateSetters(set),
-                })),
-              ])
-            );
-
-            const activeTab = tabs.get(existingValue.state.activeTabId).getState();
-            const activeTabSource = new tabSources[activeTab.source.type](activeTab.source.metadata as any);
-
-            return {
-              ...existingValue,
-              state: {
-                ...existingValue.state,
-                tabs,
-                tabsIndex,
-                activeTabSource,
-              },
-            };
           },
           removeItem: (name) => localStorage.removeItem(name),
         },
