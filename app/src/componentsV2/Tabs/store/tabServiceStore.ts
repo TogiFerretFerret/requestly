@@ -5,6 +5,7 @@ import { createTabStore, TabState, tabStateSetters } from "./tabStore";
 import { AbstractTabSource } from "../helpers/tabSource";
 import { createContext, ReactNode, useContext } from "react";
 import { tabSources } from "../constants";
+import { trackTabOpenClicked, trackTabOpened } from "../analytics";
 
 type TabId = number;
 type SourceName = string;
@@ -80,6 +81,8 @@ const createTabServiceStore = () => {
           set({
             tabs: new Map(tabs),
           });
+
+          trackTabOpened(sourceId, source.type, config?.preview);
         },
 
         updateTabBySourceId(sourceId, updates) {
@@ -102,13 +105,16 @@ const createTabServiceStore = () => {
         },
 
         openTab(source, config) {
-          const { _generateNewTabId, tabsIndex, tabs, setActiveTab, registerTabSource } = get();
           const sourceId = source.getSourceId();
           const sourceName = source.getSourceName();
+          trackTabOpenClicked(sourceId, source.type, config?.preview);
+
+          const { _generateNewTabId, tabsIndex, tabs, setActiveTab, registerTabSource } = get();
 
           const existingTabId = tabsIndex.get(sourceName)?.get(sourceId);
           if (existingTabId) {
             setActiveTab(existingTabId);
+            trackTabOpened(sourceId, source.type, config?.preview);
             return;
           }
 
