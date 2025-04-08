@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { tabServiceStore } from "./store/tabServiceStore";
 import PATHS from "config/constants/sub/paths";
+import { ResetTabSource } from "./analytics";
 
 export const useSetUrl = () => {
   const navigate = useNavigate();
@@ -33,8 +34,8 @@ const navigate = (path: string) => {
 };
 
 export const getTabServiceActions = () => {
-  const resetTabs = () => {
-    tabServiceStore.getState().reset();
+  const resetTabs = (source: ResetTabSource) => {
+    tabServiceStore.getState().reset(source);
     navigate(PATHS.API_CLIENT.RELATIVE);
   };
 

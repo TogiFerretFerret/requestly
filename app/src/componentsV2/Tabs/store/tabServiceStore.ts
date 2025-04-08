@@ -7,6 +7,8 @@ import { AbstractTabSource } from "../helpers/tabSource";
 import { createContext, ReactNode, useContext } from "react";
 import { tabSources } from "../constants";
 import {
+  ResetTabSource,
+  trackResetTabServiceStore,
   trackTabActionEarlyReturn,
   trackTabCloseById,
   trackTabCloseClicked,
@@ -39,7 +41,7 @@ type TabsState = {
 };
 
 type TabsAction = {
-  reset: () => void;
+  reset: (source: ResetTabSource) => void;
   registerTabSource: (tabId: TabId, source: AbstractTabSource, config?: TabConfig) => void;
   updateTabBySourceId: (sourceId: SourceId, updates: Partial<Pick<TabState, "preview" | "saved" | "title">>) => void;
   openTab: (source: AbstractTabSource, config?: TabConfig) => void;
@@ -71,9 +73,10 @@ const createTabServiceStore = () => {
       (set, get) => ({
         ...initialState,
 
-        reset() {
+        reset(source) {
           set(initialState);
           tabServiceStore.persist.clearStorage();
+          trackResetTabServiceStore(source);
         },
 
         registerTabSource(tabId, source, config) {
